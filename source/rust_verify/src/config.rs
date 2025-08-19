@@ -68,8 +68,6 @@ pub enum Vstd {
     Imported,
     /// Embed vstd and verus_builtin as modules, necessary for verifying the `core` library.
     IsCore,
-    /// For other crates in stdlib verification that import core
-    ImportedViaCore,
 }
 
 #[derive(Debug)]
@@ -312,7 +310,6 @@ pub fn parse_args_with_imports(
     const OPT_NO_VSTD: &str = "no-vstd";
     const OPT_IS_VSTD: &str = "is-vstd";
     const OPT_IS_CORE: &str = "is-core";
-    const OPT_IS_STDLIB_OUTSIDE_OF_CORE: &str = "is-stdlib-outside-of-core";
     const OPT_EXPAND_ERRORS: &str = "expand-errors";
 
     const OPT_LOG_DIR: &str = "log-dir";
@@ -495,11 +492,6 @@ pub fn parse_args_with_imports(
     );
     opts.optflag(
         "",
-        OPT_IS_STDLIB_OUTSIDE_OF_CORE,
-        "Indicates the crate being verified is the stdlib (requires a specialized setup)",
-    );
-    opts.optflag(
-        "",
         OPT_EXPAND_ERRORS,
         "When the proof fails, try to minimize the failing predicate",
     );
@@ -609,7 +601,6 @@ pub fn parse_args_with_imports(
     let no_vstd = matches.opt_present(OPT_NO_VSTD);
     let is_vstd = matches.opt_present(OPT_IS_VSTD);
     let is_core = matches.opt_present(OPT_IS_CORE);
-    let is_stdlib_outside_of_core = matches.opt_present(OPT_IS_STDLIB_OUTSIDE_OF_CORE);
     if is_vstd && is_core {
         error("contradictory options --is-core and --is-vstd".to_string());
     }
@@ -617,8 +608,6 @@ pub fn parse_args_with_imports(
         Vstd::IsVstd
     } else if is_core {
         Vstd::IsCore
-    } else if is_stdlib_outside_of_core {
-        Vstd::ImportedViaCore
     } else if no_vstd {
         Vstd::NoVstd
     } else {

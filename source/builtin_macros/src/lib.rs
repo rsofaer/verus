@@ -169,8 +169,6 @@ enum VstdKind {
     Imported,
     /// Embed vstd and verus_builtin as modules, necessary for verifying the `core` library.
     IsCore,
-    /// For other crates in stdlib verification that import core
-    ImportedViaCore,
 }
 
 fn vstd_kind() -> VstdKind {
@@ -186,10 +184,8 @@ fn vstd_kind() -> VstdKind {
                     return VstdKind::Imported;
                 } else if &s == "IsCore" {
                     return VstdKind::IsCore;
-                } else if &s == "ImportsCore" {
-                    return VstdKind::ImportedViaCore;
                 } else {
-                    panic!("The environment variable VSTD_KIND was set but its value is invalid. Allowed values are 'IsVstd', 'NoVstd', 'Imported', 'IsCore', and 'ImportsCore'");
+                    panic!("The environment variable VSTD_KIND was set but its value is invalid. Allowed values are 'IsVstd', 'NoVstd', 'Imported', and 'IsCore'");
                 }
             }
             _ => { }
@@ -202,8 +198,7 @@ fn vstd_kind() -> VstdKind {
             return VstdKind::IsVstd;
         }
 
-        // For tests, which don't go through the verus binary, we infer the mode from
-        // these cfg options
+        // TODO: consider using the environment variable for these instead
         if cfg_verify_core() {
             return VstdKind::IsCore;
         }
@@ -244,7 +239,7 @@ pub(crate) fn cfg_verify_core() -> bool {
 }
 
 #[cfg(verus_keep_ghost)]
-fn cfg_no_vstd() -> bool {
+pub(crate) fn cfg_no_vstd() -> bool {
     static CFG_VERIFY_CORE: OnceLock<bool> = OnceLock::new();
     *CFG_VERIFY_CORE.get_or_init(|| {
         let ts: proc_macro::TokenStream = quote::quote! { ::core::cfg!(verus_no_vstd) }.into();
@@ -266,7 +261,7 @@ fn cfg_no_vstd() -> bool {
 
 // Because 'expand_expr' is unstable, we need a different impl when `not(verus_keep_ghost)`.
 #[cfg(not(verus_keep_ghost))]
-fn cfg_no_vstd() -> bool {
+pub(crate) fn cfg_no_vstd() -> bool {
     false
 }
 

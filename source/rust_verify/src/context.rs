@@ -36,6 +36,7 @@ pub struct ContextX<'tcx> {
     pub(crate) arch_word_bits: Option<vir::ast::ArchWordBits>,
     pub(crate) crate_name: Ident,
     pub(crate) vstd_crate_name: Ident,
+    pub(crate) name_def_id_map: std::rc::Rc<std::cell::RefCell<std::collections::HashMap<Path, DefId>>>,
 }
 
 #[derive(Clone)]

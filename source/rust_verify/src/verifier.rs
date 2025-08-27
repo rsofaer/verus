@@ -1,3 +1,4 @@
+use crate::boundary_suggestions::build_boundary_suggestion;
 use crate::commands::{Op, OpGenerator, OpKind, QueryOp, Style};
 use crate::config::{Args, CargoVerusArgs, ShowTriggers};
 use crate::context::{ContextX, ErasureInfo};
@@ -2700,6 +2701,7 @@ impl Verifier {
             arch_word_bits: None,
             crate_name: Arc::new(crate_name.clone()),
             vstd_crate_name,
+            name_def_id_map: std::rc::Rc::new(std::cell::RefCell::new(HashMap::new())),
         });
 
         let ctxt_diagnostics = ctxt.diagnostics.clone();
@@ -2821,7 +2823,27 @@ impl Verifier {
         };
         for diag in ctxt.diagnostics.borrow_mut().drain(..) {
             match diag {
-                vir::ast::VirErrAs::NonBlockingError(err) => {
+                vir::ast::VirErrAs::NonBlockingError(err, maybe_p) => {
+                    // This diagnostic message may be a verification boundary violation.
+                    // In that case, we want to try to construct a suggestion to deal with the problem.
+
+                    let err = match maybe_p {
+                        Some(p) => {
+                            // Try to build a DefId, then check if the corresponding Def is an Adt or Fun-like
+                            // let did = vir_path_to_def_id(tcx, &ctxt.verus_items, &p);
+                            let did: Option<rustc_hir::def_id::DefId> = None;
+                            match did {
+                                Some(did) => {
+                                    match build_boundary_suggestion(&ctxt, did, &p) {
+                                        Ok(s) => err.help(s),
+                                        Err(_) => err,
+                                    }
+                                },
+                                None => err,
+                            }
+                        },
+                        None => err,
+                    };
                     if first_error.is_none() {
                         first_error = Some(err.clone().into())
                     } else {
@@ -3101,7 +3123,7 @@ impl rustc_driver::Callbacks for VerifierCallbacksEraseMacro {
                         vir::ast::VirErrAs::Note(err) => {
                             reporter.report_as(&err.to_any(), MessageLevel::Note)
                         }
-                        vir::ast::VirErrAs::NonBlockingError(err) => {
+                        vir::ast::VirErrAs::NonBlockingError(err, _) => {
                             reporter.report_as(&err.to_any(), MessageLevel::Error)
                         }
                     }

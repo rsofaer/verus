@@ -1,8 +1,5 @@
 use crate::ast::{
-    BodyVisibility, CallTarget, CallTargetKind, Datatype, DatatypeTransparency, Dt, Expr, ExprX,
-    FieldOpr, Fun, Function, FunctionKind, Krate, MaskSpec, Mode, MultiOp, Opaqueness, Path, PathX,
-    Pattern, PatternX, Place, PlaceX, Trait, Typ, TypX, UnaryOp, UnaryOpr, UnwindSpec, VarIdent,
-    VirErr, VirErrAs, Visibility,
+    BodyVisibility, CallTarget, CallTargetKind, Datatype, DatatypeTransparency, DatatypeX, Dt, Expr, ExprX, FieldOpr, Fun, Function, FunctionKind, Krate, MaskSpec, Mode, MultiOp, Opaqueness, Path, PathX, Pattern, PatternX, Place, PlaceX, Trait, Typ, TypX, UnaryOp, UnaryOpr, UnwindSpec, VarIdent, VirErr, VirErrAs, Visibility
 };
 use crate::ast_util::{
     dt_as_friendly_rust_name, fun_as_friendly_rust_name, is_body_visible_to, is_visible_to_opt,
@@ -34,7 +31,7 @@ fn check_one_typ<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     match &**typ {
         TypX::Datatype(Dt::Path(path), _, _) => {
@@ -60,7 +57,7 @@ fn check_typ<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     crate::ast_visitor::typ_visitor_check(typ, &mut |t| check_one_typ(ctxt, t, span, emit))
 }
@@ -71,9 +68,9 @@ fn check_path_and_get_datatype<'a, Emit>(
     path: &Path,
     span: &crate::messages::Span,
     emit: &mut Emit,
-) -> Result<&'a Datatype, VirErr>
+) -> Result<Datatype, VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     fn is_proxy<'a>(ctxt: &'a Ctxt, path: &Path) -> Option<&'a Dt> {
         for dt in &ctxt.unpruned_krate.datatypes {
@@ -92,12 +89,12 @@ where
     fn get_external_maybe<'a>(
         ctxt: &'a Ctxt,
         path: &Path,
-    ) -> Option<&'a (Arc<PathX>, Result<(Datatype, String), VirErr>)> {
-        ctxt.krate.external_types.iter().find(|(p, _)| p == path)
+    ) -> Option<&'a Arc<PathX>> {
+        ctxt.krate.external_types.iter().find(|p| *p == path)
     }
 
     match ctxt.dts.get(path) {
-        Some(dt) => Ok(dt),
+        Some(dt) => Ok(dt.clone()),
         None => {
             if let Some(actual_path) = is_proxy(ctxt, path) {
                 return Err(error(
@@ -108,45 +105,34 @@ where
                         dt_as_friendly_rust_name(actual_path),
                     ),
                 ));
-            } else if let Some((_, suggestion)) = get_external_maybe(ctxt, path) {
-                let path_string = path_as_friendly_rust_name(path);
-
-                match suggestion {
-                    Ok((dummy_dt, suggestion)) => {
-                        let err = VirErrAs::NonBlockingError(error(
-                            span,
-                            &format!(
-                                "cannot use type `{:}` which is ignored because it is declared outside the verus! macro.{}",
-                                path_string, suggestion
-                            ),
-                        ));
-                        emit((Some(path_string), err));
-                        // Return a dummy datatype so we can accumulate a full set of errors.
-                        return Ok(dummy_dt);
-                    }
-                    Err(e) => {
-                        return Err(error(
-                            span,
-                            format!(
-                                "\nAn external_type_specification is needed to use {} from verified code, suggestion construction failed:\n{}",
-                                path_string, e.note
-                            ),
-                        ));
-                    }
-                };
             } else {
-                let rpath = path_as_friendly_rust_name(path);
-                return Err(error(
-                    span,
-                    &format!(
-                        "`{rpath:}` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute){:}",
+                let path_string = path_as_friendly_rust_name(path);
+                let (locally_defined, dt) = match get_external_maybe(ctxt, path) {
+                    Some(_) => (true, build_dummy_dt(span, path)),
+                    _ => (false, build_dummy_dt(span, path)),
+                };
+                let msg = if locally_defined {
+                    format!(
+                        "cannot use type `{path_string:}` which is ignored because it is declared outside the verus! macro.",
+                    )
+                } else {
+                    format!(
+                        "`{path_string:}` is not supported (note: you may be able to add a Verus specification to this type with the `external_type_specification` attribute){:}",
                         if path.is_rust_std_path() {
                             " (note: the vstd library provides some specification for the Rust std library, but it is currently limited)"
                         } else {
                             ""
                         },
-                    ),
-                ));
+                    )
+                };
+                let err: VirErrAs = VirErrAs::NonBlockingError(error(
+                    span,
+                    msg,
+                ), Some(path.clone()));
+                emit((Some(path.clone()), err));
+
+
+                return Ok(dt);
             }
         }
     }
@@ -158,9 +144,9 @@ fn check_path_and_get_function<'a, Emit>(
     disallow_private_access: Option<(&Visibility, &str)>,
     span: &crate::messages::Span,
     emit: &mut Emit,
-) -> Result<&'a Function, VirErr>
+) -> Result<Function, VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     fn is_proxy<'a>(ctxt: &'a Ctxt, path: &Path) -> Option<&'a Path> {
         // Linear scan, but this only happens if this uncommon error message triggers
@@ -178,7 +164,7 @@ where
     }
 
     let f = match ctxt.funs.get(x) {
-        Some(f) => f,
+        Some(f) => f.clone(),
         None => {
             if let Some(actual_path) = is_proxy(ctxt, &x.path) {
                 return Err(error(
@@ -189,44 +175,30 @@ where
                         path_as_friendly_rust_name(actual_path),
                     ),
                 ));
-            } else if let Some((_, suggestion)) =
-                ctxt.krate.external_fns.iter().find(|info| info.0 == *x)
-            {
-                if let Ok((dummy_fn, suggestion_text)) = suggestion {
-                    let err_str = format!(
-                        "cannot use function `{:}` which is ignored because it is either declared outside the verus! macro or it is marked as `external`\n{}{}",
-                        path_as_friendly_rust_name(&x.path),
-                        "The following declaration may allow use of this function from verified code:\n",
-                        suggestion_text
-                    );
-                    emit((
-                        Some(path_as_friendly_rust_name(&x.path)),
-                        VirErrAs::NonBlockingError(error(span, &err_str)),
-                    ));
-                    return Ok(dummy_fn);
-                } else {
-                    return Err(error(
-                        span,
-                        &format!(
-                            "cannot use function `{:}` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.\n  No suggestion available: {:?}",
-                            path_as_friendly_rust_name(&x.path),
-                            suggestion.as_ref().unwrap_err().note
-                        ),
-                    ));
-                }
             } else {
-                let path = path_as_friendly_rust_name(&x.path);
-                return Err(error(
-                    span,
-                    &format!(
-                        "`{path:}` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`){:}",
+                let locally_defined = match ctxt.krate.external_fns.iter().find(|info| *info == x) {
+                    Some(_) => true,
+                    _ => false,
+                };
+                let func = build_dummy_fn(span, &x.path);
+                let path_string = path_as_friendly_rust_name(&x.path);
+                let err_str = if locally_defined {
+                    format!(
+                        "cannot use function `{:}` which is ignored because it is either declared outside the verus! macro or it is marked as `external`.",
+                        path_string)
+
+                } else {
+                    format!(
+                        "`{path_string:}` is not supported (note: you may be able to add a Verus specification to this function with `assume_specification`){:}",
                         if x.path.is_rust_std_path() {
                             " (note: the vstd library provides some specification for the Rust std library, but it is currently limited)"
                         } else {
                             ""
                         },
-                    ),
-                ));
+                    )
+                };
+                emit((Some(x.path.clone()), VirErrAs::NonBlockingError(error(span, &err_str), Some(x.path.clone()))));
+                func
             }
         }
     };
@@ -252,7 +224,7 @@ fn check_datatype_access<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     let dt = check_path_and_get_datatype(ctxt, path, span, emit)?;
     match &dt.x.transparency {
@@ -372,7 +344,7 @@ fn check_one_expr<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     match &expr.x {
         ExprX::Var(x) => {
@@ -651,7 +623,7 @@ fn check_one_place<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     match &place.x {
         PlaceX::Local(x) => {
@@ -702,7 +674,7 @@ fn check_one_pattern<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     match &pattern.x {
         PatternX::Constructor(Dt::Path(path), _id, _binders) => {
@@ -737,7 +709,7 @@ fn check_expr<Emit>(
     emit: &mut Emit,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     let check_result = crate::ast_visitor::ast_visitor_check(
         expr,
@@ -765,7 +737,7 @@ fn check_function<Emit>(
     _no_verify: bool,
 ) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     if let FunctionKind::TraitMethodImpl { method, .. } = &function.x.kind {
         if function.x.require.len() > 0 {
@@ -1321,7 +1293,7 @@ where
 
 fn check_datatype<Emit>(ctxt: &Ctxt, dt: &Datatype, emit: &mut Emit) -> Result<(), VirErr>
 where
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<Path>, VirErrAs)) -> (),
 {
     for variant in dt.x.variants.iter() {
         for field in variant.fields.iter() {
@@ -1776,13 +1748,19 @@ pub fn check_crate(
         }
     }
 
-    let mut diag_set: HashSet<String> = HashSet::new();
-    let mut emit = |(k, v)| match k {
+    let mut diag_map: HashMap<Path, usize> = HashMap::new();
+    let mut emit = |(k, v): (Option<Path>, VirErrAs)| match k {
         Some(k) => {
-            if !diag_set.contains(&k) {
-                diag_set.insert(k);
-                diags.push(v);
+            match diag_map.get(&k) {
+                Some(msg_idx) => {
+                    diags[*msg_idx] = diags[*msg_idx].merge(&v)
+                },
+                None => {
+                    diag_map.insert(k, diags.len());
+                    diags.push(v);
+                },
             }
+
         }
         None => diags.push(v),
     };
@@ -1796,4 +1774,78 @@ pub fn check_crate(
     }
     crate::recursive_types::check_recursive_types(krate)?;
     Ok(())
+}
+
+/// This function is used for optimistic compilation after error-handling.
+/// It builds a Datatype (Spanned DatatypeX) approximating what would exist
+/// in krate that can be used in place of an immediate failure.
+fn build_dummy_dt(
+    span: &crate::messages::Span,
+    external_path: &Arc<PathX>,
+) -> Datatype {
+    crate::def::Spanned::new(
+        span.clone(),
+        DatatypeX {
+            name: Dt::Path(external_path.clone()),
+            proxy: None,
+            owning_module: None,
+            visibility: Visibility { restricted_to: None },
+            transparency: DatatypeTransparency::Never,
+            typ_params: Arc::new(vec![]),
+            typ_bounds: Arc::new(vec![]),
+            variants: Arc::new(vec![]),
+            mode: Mode::Exec,
+            ext_equal: false,
+            user_defined_invariant_fn: None,
+            sized_constraint: None,
+        }
+    )
+}
+
+fn build_dummy_fn(
+    span: &crate::messages::Span,
+    external_path: &Arc<PathX>,
+) -> Function {
+    crate::def::Spanned::new(
+        span.clone(),
+    crate::ast::FunctionX {
+        name: Arc::new(crate::ast::FunX { path: external_path.clone() }),
+        proxy: None,
+        kind: FunctionKind::Static,
+        visibility: Visibility { restricted_to: None },
+        body_visibility: BodyVisibility::public(),
+        opaqueness: Opaqueness::Opaque,
+        owning_module: None,
+        mode: Mode::Exec,
+        typ_params: Arc::new(vec![]),
+        typ_bounds: Arc::new(vec![]),
+        params: Arc::new(vec![]),
+        ret: 
+            crate::def::Spanned::new(
+                span.clone(),
+                crate::ast::ParamX {
+                    name: crate::ast_util::air_unique_var(crate::def::RETURN_VALUE),
+                    typ: Arc::new(TypX::TypeId),
+                    mode: Mode::Exec,
+                    is_mut: false,
+                    unwrapped_info: None,
+                }
+            
+        ),
+        ens_has_return: true,
+        require: Arc::new(vec![]),
+        ensure: (Arc::new(vec![]), Arc::new(vec![])),
+        returns: None,
+        decrease: Arc::new(vec![]),
+        decrease_when: None,
+        decrease_by: None,
+        fndef_axioms: None,
+        mask_spec: None,
+        unwind_spec: None,
+        item_kind: crate::ast::ItemKind::Function,
+        attrs: Default::default(),
+        body: None,
+        extra_dependencies: vec![],
+    })
+
 }

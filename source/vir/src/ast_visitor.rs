@@ -968,7 +968,7 @@ where
     FP: FnMut(&VisitorScopeMap, &Pattern, &mut Emit) -> Result<(), E>,
     FT: FnMut(&VisitorScopeMap, &Typ, &Span, &mut Emit) -> Result<(), E>,
     FPL: FnMut(&VisitorScopeMap, &Place, &mut Emit) -> Result<(), E>,
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<crate::ast::Path>, VirErrAs)) -> (),
 {
     match ast_visitor_dfs(
         expr,
@@ -1016,7 +1016,7 @@ where
     FP: FnMut(&VisitorScopeMap, &Pattern, &mut Emit) -> Result<(), E>,
     FT: FnMut(&VisitorScopeMap, &Typ, &Span, &mut Emit) -> Result<(), E>,
     FPL: FnMut(&VisitorScopeMap, &Place, &mut Emit) -> Result<(), E>,
-    Emit: FnMut((Option<String>, VirErrAs)) -> (),
+    Emit: FnMut((Option<crate::ast::Path>, VirErrAs)) -> (),
 {
     let mut scope_map: VisitorScopeMap = ScopeMap::new();
     ast_visitor_check_with_scope_map(expr, &mut scope_map, fe, fs, fp, ft, fpl, emit_diag)

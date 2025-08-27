@@ -16,9 +16,31 @@ use vir_macros::{ToDebugSNode, to_node_impl};
 /// Result<T, VirErr> is used when an error might need to be reported to the user
 pub type VirErr = Message;
 pub enum VirErrAs {
-    NonBlockingError(VirErr),
+    NonBlockingError(VirErr, Option<Path>),
     Warning(VirErr),
     Note(VirErr),
+}
+
+impl VirErrAs {
+    
+    /// Given a primary diagnostic message and an additional message,
+    /// fold the spans of the additional message into a new message copied from the original.
+    pub fn merge(&self, other: &VirErrAs) -> VirErrAs{
+        let added_msg = match other {
+            VirErrAs::NonBlockingError(message_x, _) |
+            VirErrAs::Warning(message_x) |
+            VirErrAs::Note(message_x) => message_x,
+        };
+        let new_msg_builder = |msg: &VirErr|  added_msg.spans.iter().fold(msg.clone(), |acc, v| acc.secondary_span(v));
+        match (self, other) {
+            (VirErrAs::NonBlockingError(orig_msg, p), _) => VirErrAs::NonBlockingError(new_msg_builder(orig_msg), p.clone()),
+            (VirErrAs::Warning(orig_msg), VirErrAs::NonBlockingError(_, p)) => VirErrAs::NonBlockingError(new_msg_builder(orig_msg), p.clone()),
+            (VirErrAs::Warning(orig_msg), _) => VirErrAs::Warning(new_msg_builder(orig_msg)),
+            (VirErrAs::Note(orig_msg), VirErrAs::NonBlockingError(_, p)) => VirErrAs::NonBlockingError(new_msg_builder(orig_msg), p.clone()),
+            (VirErrAs::Note(orig_msg), VirErrAs::Warning(..)) => VirErrAs::Warning(new_msg_builder(orig_msg)),
+            (VirErrAs::Note(orig_msg), VirErrAs::Note(..)) => VirErrAs::Note(new_msg_builder(orig_msg)),
+        }
+    }
 }
 
 /// A non-qualified name, such as a local variable name or type parameter name
@@ -1462,9 +1484,9 @@ pub struct KrateX {
     /// List of all modules in the crate
     pub modules: Vec<Module>,
     /// List of all 'external' functions in the crate (only useful for diagnostics)
-    pub external_fns: Vec<(Fun, Result<(Function, String), VirErr>)>,
+    pub external_fns: Vec<Fun>,
     /// List of all 'external' types in the crate (only useful for diagnostics)
-    pub external_types: Vec<(Path, Result<(Datatype, String), VirErr>)>,
+    pub external_types: Vec<Path>,
     /// Map rustc-based internal paths to friendlier names for error messages
     pub path_as_rust_names: Vec<(Path, String)>,
     /// Arch info

@@ -62,12 +62,38 @@ fn def_path_to_vir_path<'tcx>(tcx: TyCtxt<'tcx>, def_path: DefPath) -> Option<Pa
     }
     Some(Arc::new(PathX { krate, segments: Arc::new(segments) }))
 }
+// fn vir_path_to_def_path<'tcx>(tcx: TyCtxt<'tcx>, path: &Path) -> Option<DefPath> {
+//     let crate_num = match &path.krate {
+//         Some(s) => tcx.crates(()).iter().find(|num| tcx.crate_name(**num).as_str() == s.as_str()).expect("Could not find originating crate of vir path.").clone(),
+//         None => LOCAL_CRATE,
+//     };
+//     use rustc_hir::definitions::DefPathData;
+//     use rustc_hir::definitions::DisambiguatedDefPathData;
+//     let mut def_path = DefPath {
+//         data: vec![],
+//         krate: crate_num 
+//     };
+//     for d in path.segments.iter() {
 
-pub(crate) fn typ_path_and_ident_to_vir_path<'tcx>(path: &Path, ident: vir::ast::Ident) -> Path {
-    let mut path = (**path).clone();
-    Arc::make_mut(&mut path.segments).push(ident);
-    Arc::new(path)
-}
+//         if d.as_str() == vir::def::RUST_DEF_CTOR {
+//             def_path.data.push(DisambiguatedDefPathData { data: DefPathData::Ctor, disambiguator: 0 });
+            
+//         } else if let Some(impl_suffix) = d.strip_prefix(vir::def::PREFIX_IMPL_IDENT)  {
+//             def_path.data.push(DisambiguatedDefPathData { data: DefPathData::Impl, disambiguator: impl_suffix.parse().expect(&("Suffix of impl path component was not parsed as number: ".to_owned() + impl_suffix)) })
+//         } else {
+//             // This path component is either a ValueNs or a TypeNs
+//             return None
+//         }
+        
+//     }
+//     Some(def_path)
+// }
+
+// pub(crate) fn typ_path_and_ident_to_vir_path<'tcx>(path: &Path, ident: vir::ast::Ident) -> Path {
+//     let mut path = (**path).clone();
+//     Arc::make_mut(&mut path.segments).push(ident);
+//     Arc::new(path)
+// }
 
 // Register an alternative "friendly" paths for printing better error messages
 // or for the command-line --verify-function arguments.
@@ -176,6 +202,18 @@ pub(crate) fn def_id_to_vir_path<'tcx>(
     def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
         .unwrap_or_else(|| panic!("unhandled name {:?}", def_id))
 }
+
+// pub(crate) fn def_id_to_vir_path<'tcx>(
+//     tcx: TyCtxt<'tcx>,
+//     verus_items: &crate::verus_items::VerusItems,
+//     def_id: DefId,
+//     // path_def_id_map: &mut HashMap<Path, DefId>,
+// ) -> Path {
+//     let result = def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
+//         .unwrap_or_else(|| panic!("unhandled name {:?}", def_id));
+//     // path_def_id_map.insert(result.clone(), def_id);
+//     result
+// }
 
 pub(crate) fn def_id_to_datatype<'tcx, 'hir>(
     tcx: TyCtxt<'tcx>,

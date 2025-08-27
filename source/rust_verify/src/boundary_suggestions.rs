@@ -22,85 +22,19 @@ use crate::{
     util::{err_span, err_span_bare},
 };
 
-/// This function is used for optimistic compilation after error-handling.
-/// It builds a Datatype (Spanned DatatypeX) approximating what would exist
-/// in krate that can be used in place of an immediate failure.
-/// The bool is true if the type is explicitly marked external.
-pub(crate) fn build_dummy_dt<'tcx>(
+pub(crate) fn build_boundary_suggestion<'tcx>(
     ctxt: &Context<'tcx>,
-    external_adt_path: &Arc<vir::ast::PathX>,
     external_def_id: DefId,
-    generics: &'tcx rustc_hir::Generics<'tcx>,
-) -> Result<Datatype, VirErr> {
-    let external_def_span = ctxt.tcx.def_span(external_def_id);
-    let external_ty = ctxt.tcx.type_of(external_def_id).skip_binder();
-    let (external_adt_def, _substs_ref) = match external_ty.kind() {
-        TyKind::Adt(adt_def, substs_ref) => (adt_def, substs_ref),
-        _ => {
-            return err_span(
-                external_def_span,
-                "dummy_dt: the external type needs to be a struct or enum",
-            );
-        }
-    };
-    if !external_adt_def.is_struct() && !external_adt_def.is_enum() {
-        return err_span(
-            external_def_span,
-            "dummy_dt: the external type needs to be a struct or enum",
-        );
-    }
-    let attrs: Vec<Attribute> = ctxt.tcx.get_all_attrs(external_def_id).cloned().collect();
-    let vattrs = get_verifier_attrs(attrs.iter().as_slice(), None)?;
-    let (typ_params, typ_bounds) = check_generics_bounds_with_polarity(
-        ctxt.tcx,
-        &ctxt.verus_items,
-        generics.span,
-        Some(generics),
-        vattrs.external_body,
-        external_def_id,
-        Some(&vattrs),
-        Some(&mut *ctxt.diagnostics.borrow_mut()),
-    )?;
-    let dt = DatatypeX {
-        name: vir::ast::Dt::Path(external_adt_path.to_owned()),
-        proxy: Some(
-            (*ctxt.spanned_new(
-                external_def_span,
-                external_adt_path
-                    .pop_segment()
-                    .push_segment(format!("Ex{}", external_adt_path.last_segment()).into())
-                    .to_owned(),
-            ))
-            .clone(),
-        ),
-        owning_module: Some(external_adt_path.pop_segment()),
-        visibility: mk_visibility(ctxt, external_def_id),
-        transparency: DatatypeTransparency::WhenVisible(vir::ast::Visibility::public()), // Should be WhenVisible if the proxy being created is not marked external_body
-        typ_params: typ_params,
-        typ_bounds: typ_bounds,
-        variants: Vec::new().into(),
-        mode: Mode::Exec,
-        ext_equal: false,
-        user_defined_invariant_fn: None,
-        sized_constraint: None,
-    };
-
-    Ok(ctxt.spanned_new(external_def_span, dt))
+    path: &Arc<vir::ast::PathX>,
+) -> Result<String, VirErr> {
+    Err(crate::util::error("Not implemented"))
 }
-
-pub(crate) fn build_proxy_declaration<'tcx>(
+pub(crate) fn build_external_type_suggestion<'tcx>(
     ctxt: &Context<'tcx>,
-    external_adt_path: &Arc<vir::ast::PathX>,
     external_def_id: DefId,
-    hir_generics: &'tcx rustc_hir::Generics<'tcx>,
-) -> Result<(Datatype, String), VirErr> {
+    path: &Arc<vir::ast::PathX>,
+) -> Result<String, VirErr> {
     let path_string = ctxt.tcx.def_path_str(external_def_id);
-    let dummy_dt = build_dummy_dt(ctxt, external_adt_path, external_def_id, hir_generics)?;
-    let proxy_path = dummy_dt
-        .x
-        .proxy
-        .as_ref()
-        .ok_or(err_span_bare(ctxt.tcx.def_span(external_def_id), "Could not build proxy path"))?;
     let generics = ctxt.tcx.generics_of(external_def_id);
     let mut region_renamer: RegionRenamer<'_> =
         build_region_renamer(ctxt, external_def_id, generics)?;
@@ -114,7 +48,7 @@ pub(crate) fn build_proxy_declaration<'tcx>(
     // Map to str so that the type params come out sorted.
     let all_type_params: BTreeSet<&str> = all_type_symbols.iter().map(|s| s.as_str()).collect(); // Need to have all type params for recursive declarations.
     let where_clauses = build_where_clauses(ctxt, predicates, type_param_set)?;
-
+    let visibility = mk_visibility(ctxt, external_def_id);
     let suggestion =
         format!(
             "\nThe following declaration may allow Verus to refer to this type from verified code:\n{}{}{}{}{}{}{}{}{}{}{}{}",
@@ -124,12 +58,12 @@ pub(crate) fn build_proxy_declaration<'tcx>(
                 + x
                 + ")]\n",),
             "#[verifier::external_type_specification]\n",
-            match dummy_dt.x.visibility.restricted_to {
+            match visibility.restricted_to {
                 None => "pub ",
                 Some(_) => "", // This may be the point that it makes sense to check for the type being in a private module or otherwise not visible
             },
             "struct ",
-            &proxy_path.x.last_segment(), // Proxy type name
+            &path.last_segment(), // Proxy type name
             if generics.is_empty() {
                 "".to_owned()
             } else {
@@ -144,7 +78,7 @@ pub(crate) fn build_proxy_declaration<'tcx>(
             },
             "(",
             path_string, // External Type name
-            if dummy_dt.x.typ_params.is_empty() {
+            if param_declarations.is_empty() {
                 "".to_owned()
             } else {
                 param_declarations
@@ -162,7 +96,7 @@ pub(crate) fn build_proxy_declaration<'tcx>(
             }, // Where clause generic bounds
             ";",
         );
-    Ok((dummy_dt, suggestion))
+    Ok(suggestion)
 }
 pub(crate) fn check_visibilities<'tcx, T: TypeVisitable<TyCtxt<'tcx>>>(
     tcx: TyCtxt<'tcx>,
@@ -194,52 +128,15 @@ pub(crate) fn build_fn_assume_specification_suggestion<'tcx>(
     ctxt: &Context<'tcx>,
     external_def_id: DefId,
     path: Arc<vir::ast::PathX>,
-) -> Result<(Function, String), VirErr> {
+) -> Result<String, VirErr> {
     // First, we will validate that this function and the types referenced from it are accessible from the calling code.
 
     let fn_sig = ctxt.tcx.fn_sig(external_def_id).instantiate_identity().skip_binder();
     check_visibilities(ctxt.tcx, fn_sig)?;
 
     let ret_ty = fn_sig.output();
-    let ret_ty_x = Arc::new(TypX::TypeId);
 
-    let ret_param = ParamX {
-        name: vir::ast_util::air_unique_var(vir::def::RETURN_VALUE),
-        typ: ret_ty_x,
-        mode: Mode::Exec,
-        is_mut: false,
-        unwrapped_info: None,
-    };
-    let ret = ctxt.spanned_new(ctxt.tcx.def_span(external_def_id), ret_param);
-
-    let function_x = FunctionX {
-        name: Arc::new(FunX { path: path }),
-        proxy: None,
-        kind: FunctionKind::Static,
-        visibility: mk_visibility(ctxt, external_def_id),
-        body_visibility: BodyVisibility::public(),
-        opaqueness: Opaqueness::Opaque,
-        owning_module: None,
-        mode: Mode::Exec,
-        typ_params: Arc::new(vec![]),
-        typ_bounds: Arc::new(vec![]),
-        params: Arc::new(vec![]),
-        ret: ret,
-        ens_has_return: true,
-        require: Arc::new(vec![]),
-        ensure: (Arc::new(vec![]), Arc::new(vec![])),
-        returns: None,
-        decrease: Arc::new(vec![]),
-        decrease_when: None,
-        decrease_by: None,
-        fndef_axioms: None,
-        mask_spec: None,
-        unwind_spec: None,
-        item_kind: ItemKind::Function,
-        attrs: Default::default(),
-        body: None,
-        extra_dependencies: vec![],
-    };
+    let visibility = mk_visibility(ctxt, external_def_id);
 
     let predicates = ctxt.tcx.predicates_of(external_def_id);
     let inst_predicates = predicates.instantiate_identity(ctxt.tcx);
@@ -277,7 +174,7 @@ pub(crate) fn build_fn_assume_specification_suggestion<'tcx>(
 
     let suggestion_text = format!(
         "{}assume_specification{} [{}] ({}){}{}{};",
-        if function_x.visibility.is_public() { "pub " } else { "" },
+        if visibility.is_public() { "pub " } else { "" },
         if generics.is_empty() {
             "".to_owned()
         } else {
@@ -306,7 +203,7 @@ pub(crate) fn build_fn_assume_specification_suggestion<'tcx>(
             where_clauses.iter().fold("\nwhere".to_owned(), |acc, x| acc + "\n" + &x + ",")
         },
     );
-    Ok((ctxt.spanned_new(ctxt.tcx.def_span(external_def_id), function_x), suggestion_text))
+    Ok(suggestion_text)
 }
 
 /// A called external item may have anonymous early-bound lifetimes.

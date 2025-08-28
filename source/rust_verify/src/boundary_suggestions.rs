@@ -3,23 +3,18 @@ use std::{
     sync::Arc,
 };
 
-use rustc_hir::{Attribute, def_id::DefId};
+use rustc_hir::def_id::DefId;
 use rustc_middle::ty::{
     EarlyParamRegion, GenericArg, GenericParamDefKind, InstantiatedPredicates, TyCtxt, TyKind,
 };
 use rustc_type_ir::{
     Interner, TypeFoldable, TypeFolder, TypeSuperVisitable, TypeVisitable, TypeVisitor,
 };
-use vir::ast::{
-    BodyVisibility, Datatype, DatatypeTransparency, DatatypeX, FunX, Function, FunctionKind,
-    FunctionX, ItemKind, Mode, Opaqueness, ParamX, TypX, VirErr,
-};
+use vir::ast::VirErr;
 
 use crate::{
-    attributes::get_verifier_attrs,
     context::Context,
-    rust_to_vir_base::{check_generics_bounds_with_polarity, mk_visibility},
-    util::{err_span, err_span_bare},
+    rust_to_vir_base::mk_visibility,
 };
 
 pub(crate) fn build_boundary_suggestion<'tcx>(
@@ -27,7 +22,16 @@ pub(crate) fn build_boundary_suggestion<'tcx>(
     external_def_id: DefId,
     path: &Arc<vir::ast::PathX>,
 ) -> Result<String, VirErr> {
-    Err(crate::util::error("Not implemented"))
+    match ctxt.tcx.def_kind(external_def_id) {
+        rustc_hir::def::DefKind::Struct |
+        rustc_hir::def::DefKind::Union  |
+        rustc_hir::def::DefKind::Enum   |
+        rustc_hir::def::DefKind::Variant => build_external_type_suggestion(ctxt, external_def_id, path),
+        rustc_hir::def::DefKind::AssocFn |
+        rustc_hir::def::DefKind::Fn => build_fn_assume_specification_suggestion(ctxt, external_def_id),
+        rustc_hir::def::DefKind::Const => build_const_assume_specification_suggestion(ctxt, external_def_id, path),
+        _ => Err(crate::util::error("Building boundary suggestion for non type/fn/const"))
+    }
 }
 pub(crate) fn build_external_type_suggestion<'tcx>(
     ctxt: &Context<'tcx>,
@@ -127,7 +131,6 @@ pub(crate) fn check_visibilities<'tcx, T: TypeVisitable<TyCtxt<'tcx>>>(
 pub(crate) fn build_fn_assume_specification_suggestion<'tcx>(
     ctxt: &Context<'tcx>,
     external_def_id: DefId,
-    path: Arc<vir::ast::PathX>,
 ) -> Result<String, VirErr> {
     // First, we will validate that this function and the types referenced from it are accessible from the calling code.
 
@@ -441,10 +444,8 @@ fn build_generics_declarations<'tcx>(
 pub(crate) fn build_const_assume_specification_suggestion<'tcx>(
     _ctxt: &Context<'tcx>,
     _external_def_id: DefId,
-    _ident: rustc_span::Ident,
-    _path: Arc<vir::ast::PathX>,
-    _generics: &'tcx rustc_hir::Generics<'tcx>,
-) -> Result<(Function, String), VirErr> {
+    _path: &Arc<vir::ast::PathX>,
+) -> Result<String, VirErr> {
     Err(crate::util::error("const suggestion not supported"))
 }
 

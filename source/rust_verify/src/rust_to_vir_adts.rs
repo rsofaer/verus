@@ -167,7 +167,7 @@ pub(crate) fn check_item_struct<'tcx>(
         Some(&vattrs),
         Some(&mut *ctxt.diagnostics.borrow_mut()),
     )?;
-    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id);
+    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id, ctxt.name_def_id_map.try_borrow_mut().ok());
     let name = path.segments.last().expect("unexpected struct path");
 
     let variant_name = name.clone();
@@ -255,7 +255,7 @@ pub(crate) fn check_item_enum<'tcx>(
         Some(&vattrs),
         Some(&mut *ctxt.diagnostics.borrow_mut()),
     )?;
-    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id);
+    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id, ctxt.name_def_id_map.try_borrow_mut().ok());
     let mut total_vis = visibility.clone();
     let mut variants: Vec<_> = vec![];
     for variant in enum_def.variants.iter() {
@@ -345,7 +345,7 @@ pub(crate) fn check_item_union<'tcx>(
         Some(&vattrs),
         Some(&mut *ctxt.diagnostics.borrow_mut()),
     )?;
-    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id);
+    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id, ctxt.name_def_id_map.try_borrow_mut().ok());
 
     let (variants, transparency) = if vattrs.external_body {
         let name = path.segments.last().expect("unexpected struct path");
@@ -639,7 +639,7 @@ pub(crate) fn check_item_external<'tcx>(
     )?;
     let mode = Mode::Exec;
 
-    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, external_def_id);
+    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, external_def_id, ctxt.name_def_id_map.try_borrow_mut().ok());
     let name = path.segments.last().expect("unexpected struct path");
 
     let is_builtin_external = matches!(
@@ -653,7 +653,7 @@ pub(crate) fn check_item_external<'tcx>(
         );
     }
 
-    let proxy_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, proxy_adt_def.did());
+    let proxy_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, proxy_adt_def.did(), ctxt.name_def_id_map.try_borrow_mut().ok());
     let proxy = ctxt.spanned_new(span, proxy_path);
     let proxy = Some((*proxy).clone());
     let owning_module = Some(module_path.clone());

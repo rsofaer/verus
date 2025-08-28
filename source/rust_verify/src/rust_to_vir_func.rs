@@ -355,8 +355,8 @@ fn compare_external_ty_or_true<'tcx>(
             match (trait_def1, trait_def2) {
                 (None, None) => true,
                 (Some(trait_def1), Some(trait_def2)) => {
-                    let mut trait_path1 = def_id_to_vir_path(tcx, verus_items, trait_def1);
-                    let trait_path2 = def_id_to_vir_path(tcx, verus_items, trait_def2);
+                    let mut trait_path1 = def_id_to_vir_path(tcx, verus_items, trait_def1, None);
+                    let trait_path2 = def_id_to_vir_path(tcx, verus_items, trait_def2, None);
                     if trait_path1 == *from_path {
                         trait_path1 = to_path.clone();
                     }
@@ -477,7 +477,7 @@ pub(crate) fn handle_external_fn<'tcx>(
             let body = find_body(ctxt, body_id);
             get_external_def_id(ctxt.tcx, &ctxt.verus_items, id, body_id, body, sig)?
         };
-    let external_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, external_id);
+    let external_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, external_id, ctxt.name_def_id_map.try_borrow_mut().ok());
 
     if external_path.krate == Some(Arc::new("verus_builtin".to_string()))
         && &*external_path.last_segment() != "clone"
@@ -911,7 +911,7 @@ pub(crate) fn check_item_fn<'tcx>(
     external_info: &mut ExternalInfo,
     autoderive_action: Option<&AutomaticDeriveAction>,
 ) -> Result<Option<Fun>, VirErr> {
-    let mut this_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id);
+    let mut this_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id, ctxt.name_def_id_map.try_borrow_mut().ok());
 
     let is_verus_spec = this_path.segments.last().expect("segment.last").starts_with(VERUS_SPEC);
 
@@ -955,8 +955,8 @@ pub(crate) fn check_item_fn<'tcx>(
 
     let external_trait_from_to = if let Some((to_trait_id, to_spec_name)) = external_trait {
         let from_trait_id = ctxt.tcx.parent(id);
-        let from_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, from_trait_id);
-        let to_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, to_trait_id);
+        let from_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, from_trait_id, ctxt.name_def_id_map.try_borrow_mut().ok());
+        let to_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, to_trait_id, ctxt.name_def_id_map.try_borrow_mut().ok());
         let to_spec_path = if let Some(name) = to_spec_name {
             Some(from_path.pop_segment().push_segment(Arc::new(name.clone())))
         } else {
@@ -2030,7 +2030,7 @@ pub(crate) fn get_external_def_id<'tcx>(
                 impl_item_args: _,
                 resolved_item: ResolvedItem::FromImpl(impl_item_id, _args),
             } => {
-                let trait_path = def_id_to_vir_path(tcx, verus_items, trait_def_id);
+                let trait_path = def_id_to_vir_path(tcx, verus_items, trait_def_id, None);
 
                 let mut types: Vec<Typ> = vec![];
 
@@ -2049,9 +2049,9 @@ pub(crate) fn get_external_def_id<'tcx>(
 
                 let kind = FunctionKind::ForeignTraitMethodImpl {
                     method: Arc::new(FunX {
-                        path: def_id_to_vir_path(tcx, verus_items, external_id),
+                        path: def_id_to_vir_path(tcx, verus_items, external_id, None),
                     }),
-                    impl_path: def_id_to_vir_path(tcx, verus_items, impl_def_id),
+                    impl_path: def_id_to_vir_path(tcx, verus_items, impl_def_id, None),
                     trait_path: trait_path,
                     trait_typ_args: Arc::new(types),
                 };
@@ -2075,7 +2075,7 @@ pub(crate) fn check_item_const_or_static<'tcx>(
     body_id: &BodyId,
     is_static: bool,
 ) -> Result<Fun, VirErr> {
-    let mut path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id);
+    let mut path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id, ctxt.name_def_id_map.try_borrow_mut().ok());
 
     let vattrs = ctxt.get_verifier_attrs(attrs)?;
     if vattrs.unerased_proxy {
@@ -2232,7 +2232,7 @@ pub(crate) fn check_foreign_item_fn<'tcx>(
 ) -> Result<(), VirErr> {
     let vattrs = ctxt.get_verifier_attrs(attrs)?;
 
-    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id);
+    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id, ctxt.name_def_id_map.try_borrow_mut().ok());
     let name = Arc::new(FunX { path });
 
     if vattrs.external_fn_specification {

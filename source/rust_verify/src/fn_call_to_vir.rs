@@ -180,7 +180,7 @@ pub(crate) fn fn_call_to_vir<'tcx>(
         "call of trait impl"
     );
 
-    let path = def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, f);
+    let path = def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, f, bctx.ctxt.name_def_id_map.try_borrow_mut().ok());
     let name = Arc::new(FunX { path: path.clone() });
     let autospec_usage = if bctx.in_ghost { AutospecUsage::IfMarked } else { AutospecUsage::Final };
 
@@ -212,7 +212,7 @@ pub(crate) fn fn_call_to_vir<'tcx>(
                 let impl_paths = get_impl_paths(bctx, did, args, None);
 
                 let f =
-                    Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, did) });
+                    Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, did, bctx.ctxt.name_def_id_map.try_borrow_mut().ok()) });
                 record_name = f.clone();
 
                 (
@@ -248,7 +248,7 @@ pub(crate) fn fn_call_to_vir<'tcx>(
                 };
 
                 let f =
-                    Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, did) });
+                    Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, did, bctx.ctxt.name_def_id_map.try_borrow_mut().ok()) });
                 record_name = f.clone();
 
                 let f = vir::def::trait_inherit_default_name(&f, &impl_path);
@@ -307,7 +307,7 @@ pub(crate) fn deref_to_vir<'tcx>(
     let node_substs = tcx.mk_args(&[GenericArg::from(arg_ty)]);
 
     let trait_fun =
-        Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, trait_fun_id) });
+        Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, trait_fun_id, bctx.ctxt.name_def_id_map.try_borrow_mut().ok()) });
     let mut record_trait_fun = trait_fun.clone();
 
     let res = resolve_trait_item(span, tcx, typing_env, trait_fun_id, node_substs)?;
@@ -316,7 +316,7 @@ pub(crate) fn deref_to_vir<'tcx>(
             let typs = mk_typ_args(bctx, args, did, span)?;
             let impl_paths = get_impl_paths(bctx, did, args, None);
             let resolved =
-                Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, did) });
+                Arc::new(FunX { path: def_id_to_vir_path(tcx, &bctx.ctxt.verus_items, did, bctx.ctxt.name_def_id_map.try_borrow_mut().ok()) });
 
             record_trait_fun = resolved.clone();
 

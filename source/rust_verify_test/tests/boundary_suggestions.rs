@@ -30,7 +30,7 @@ test_verify_one_file! {
                 foo();
             }
         }
-    } => Err(err) => assert_vir_error_msg(err, "pub assume_specification [foo] ();")
+    } => Err(err) => assert_help_error_msg(err, "pub assume_specification [foo] ();")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_simple_suggestion_correct code! {
@@ -59,10 +59,10 @@ test_verify_one_file! {
                 let z: Z = foo(x, y);
             }
         }
-    } => Err(err) => assert_vir_error_msg(err, "pub assume_specification<X, Y, Z> [foo] (_0: X, _1: Y) -> Z
-where
-Y: std::cmp::Eq,
-Z: std::cmp::PartialEq,;")
+    } => Err(err) => assert_help_error_msg(err, "pub assume_specification<X, Y, Z> [foo] (_0: X, _1: Y) -> Z
+           where
+           Y: std::cmp::Eq,
+           Z: std::cmp::PartialEq,;")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_generics_suggestion_correct code! {
@@ -100,7 +100,7 @@ test_verify_one_file! {
                 let a2 = a.foo();
             }
         }
-    } => Err(err) => assert_vir_error_msg(err, "pub assume_specification [A::foo] (_0: &A) -> A;")
+    } => Err(err) => assert_help_error_msg(err, "pub assume_specification [A::foo] (_0: &A) -> A;")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_self_suggestion_correct code! {
@@ -133,9 +133,9 @@ test_verify_one_file! {
                 o.and_then(|x| Some(false))
             }
         }
-    } => Err(err) => assert_vir_error_msg(err, "pub assume_specification<T, U, F> [std::option::Option::<T>::and_then] (_0: std::option::Option<T>, _1: F) -> std::option::Option<U>
-where
-F: std::ops::FnOnce(T,) -> std::option::Option<U>,;")
+    } => Err(err) => assert_help_error_msg(err, "pub assume_specification<T, U, F> [std::option::Option::<T>::and_then] (_0: std::option::Option<T>, _1: F) -> std::option::Option<U>
+           where
+           F: std::ops::FnOnce(T,) -> std::option::Option<U>,;")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_foreign_suggestion_correct code! {
@@ -162,10 +162,10 @@ test_verify_one_file! {
                 x == y
             }
         }
-    } => Err(err) => assert_vir_error_msg(err, "pub assume_specification<'a, 'b, A, B> [<&'b A as std::cmp::PartialEq<&B>>::eq] (_0: &&'b A, _1: &&B) -> bool
-where
-A: std::cmp::PartialEq<B> + ?Sized,
-B: ?Sized,;")
+    } => Err(err) => assert_help_error_msg(err, "pub assume_specification<'a, 'b, A, B> [<&'b A as std::cmp::PartialEq<&B>>::eq] (_0: &&'b A, _1: &&B) -> bool
+           where
+           A: std::cmp::PartialEq<B> + ?Sized,
+           B: ?Sized,;")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_str_eq_suggestion_correct code! {
@@ -195,7 +195,7 @@ test_verify_one_file! {
                 format!("{}_{}", x, y)
             }
         }
-    } => Err(err) => assert_vir_error_msgs(err, &["assume_specification", "assume_specification", "no visible path"])
+    } => Err(err) => assert_help_error_msgs(err, &["assume_specification", "assume_specification"])
 }
 test_verify_one_file! {
     #[test] test_assume_specification_const_generics_suggestion_made code! {
@@ -208,7 +208,7 @@ test_verify_one_file! {
                 let a = foo::<A, 1, 2>(inputs);
             }
         }
-    } => Err(err) => assert_vir_error_msg(err, "assume_specification<A, const N: usize, const M: usize> [foo] (_0: &[A; N]) -> [A; M];")
+    } => Err(err) => assert_help_error_msg(err, "assume_specification<A, const N: usize, const M: usize> [foo] (_0: &[A; N]) -> [A; M];")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_const_generics_suggestion_correct code! {
@@ -235,9 +235,9 @@ test_verify_one_file! {
                 foo(a, b)
             }
         }
-    } => Err(e) => assert_vir_error_msg(e, "assume_specification<'a, 'b, 'c, A, B> [foo] (_0: &'a A, _1: &'b B) -> &'c A
-where
-'c: 'a + 'b,;")
+    } => Err(e) => assert_help_error_msg(e, "assume_specification<'a, 'b, 'c, A, B> [foo] (_0: &'a A, _1: &'b B) -> &'c A
+           where
+           'c: 'a + 'b,;")
 }
 test_verify_one_file! {
     #[test] test_assume_specification_region_outlives_correct code! {
@@ -269,7 +269,7 @@ test_verify_one_file! {
         fn stuff(y: Y) -> X {
             panic!()
         }
-    } => Err(err) => assert_vir_error_msgs(err, &["cannot use type `crate::X` which is ignored", "cannot use type `crate::Y` which is ignored"])
+    } => Err(err) => assert_help_error_msgs(err, &["cannot use type `crate::X` which is ignored", "cannot use type `crate::Y` which is ignored"])
 }
 
 // These two together form a 'smoke test' that the suggestions provided are correct.
@@ -287,9 +287,9 @@ test_verify_one_file! {
                 X {}
             }
         }
-    } => Err(err) => assert_vir_error_msgs(err, &["#[verifier::external_type_specification]
-struct ExX(X);", "#[verifier::external_type_specification]
-pub struct ExY(Y);"])
+    } => Err(err) => assert_help_error_msgs(err, &["#[verifier::external_type_specification]
+           struct ExX(X);", "#[verifier::external_type_specification]
+           pub struct ExY(Y);"])
 }
 test_verify_one_file! {
     #[test] two_external_type_suggestions_are_correct code! {
@@ -330,16 +330,16 @@ test_verify_one_file! {
                 x
             }
         }
-    } => Err(err) => assert_vir_error_msg(err,
+    } => Err(err) => assert_help_error_msg(err,
 "#[verifier::reject_recursive_types(A)]
-#[verifier::reject_recursive_types(B)]
-#[verifier::reject_recursive_types(C)]
-#[verifier::external_type_specification]
-struct ExX<'a, 'b, A, B, C, const N: usize>(X<'a, 'b, A, B, C, N>)
-where
-A: vstd::string::View + T,
-B: vstd::string::View<V = C> + T,
-C: vstd::string::View<V = A>,;")
+           #[verifier::reject_recursive_types(B)]
+           #[verifier::reject_recursive_types(C)]
+           #[verifier::external_type_specification]
+           struct ExX<'a, 'b, A, B, C, const N: usize>(X<'a, 'b, A, B, C, N>)
+           where
+           A: vstd::string::View + T,
+           B: vstd::string::View<V = C> + T,
+           C: vstd::string::View<V = A>,;")
 }
 // TODO: Test generic params not in lexographical order
 test_verify_one_file! {
@@ -400,16 +400,16 @@ test_verify_one_file! {
                 x
             }
         }
-    } => Err(e) => assert_vir_error_msg(e, "#[verifier::reject_recursive_types(A)]
-#[verifier::reject_recursive_types(B)]
-#[verifier::reject_recursive_types(C)]
-#[verifier::external_type_specification]
-struct ExX<'a, 'b, A, B, C, const N: usize>(X<'a, 'b, A, B, C, N>)
-where
-<A as T>::AssocT: vstd::string::View<V = A>,
-A: vstd::string::View + T,
-B: vstd::string::View<V = C> + T,
-C: vstd::string::View<V = A>,;")
+    } => Err(e) => assert_help_error_msg(e, "#[verifier::reject_recursive_types(A)]
+           #[verifier::reject_recursive_types(B)]
+           #[verifier::reject_recursive_types(C)]
+           #[verifier::external_type_specification]
+           struct ExX<'a, 'b, A, B, C, const N: usize>(X<'a, 'b, A, B, C, N>)
+           where
+           <A as T>::AssocT: vstd::string::View<V = A>,
+           A: vstd::string::View + T,
+           B: vstd::string::View<V = C> + T,
+           C: vstd::string::View<V = A>,;")
 }
 
 test_verify_one_file! {

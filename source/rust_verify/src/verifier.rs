@@ -2831,12 +2831,14 @@ impl Verifier {
                         Some(p) => {
                             // Try to build a DefId, then check if the corresponding Def is an Adt or Fun-like
                             // let did = vir_path_to_def_id(tcx, &ctxt.verus_items, &p);
-                            let did: Option<rustc_hir::def_id::DefId> = None;
+                            let map = ctxt.name_def_id_map.borrow();
+                            let did = map.get(&p);
+                            println!("name def id map: {:#?}\np: {:?}\ndid: {:?}", map, p, did);
                             match did {
                                 Some(did) => {
-                                    match build_boundary_suggestion(&ctxt, did, &p) {
-                                        Ok(s) => err.help(s),
-                                        Err(_) => err,
+                                    match build_boundary_suggestion(&ctxt, *did, &p) {
+                                        Ok(s) => err.help(format!("The following declaration may resolve this error:\n{}",s)),
+                                        Err(_) => err,//e) => err.help(format!("No suggestion could be constructed: {}", e.note)),
                                     }
                                 },
                                 None => err,

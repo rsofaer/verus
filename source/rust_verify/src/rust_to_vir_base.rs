@@ -89,11 +89,11 @@ fn def_path_to_vir_path<'tcx>(tcx: TyCtxt<'tcx>, def_path: DefPath) -> Option<Pa
 //     Some(def_path)
 // }
 
-// pub(crate) fn typ_path_and_ident_to_vir_path<'tcx>(path: &Path, ident: vir::ast::Ident) -> Path {
-//     let mut path = (**path).clone();
-//     Arc::make_mut(&mut path.segments).push(ident);
-//     Arc::new(path)
-// }
+pub(crate) fn typ_path_and_ident_to_vir_path<'tcx>(path: &Path, ident: vir::ast::Ident) -> Path {
+    let mut path = (**path).clone();
+    Arc::make_mut(&mut path.segments).push(ident);
+    Arc::new(path)
+}
 
 // Register an alternative "friendly" paths for printing better error messages
 // or for the command-line --verify-function arguments.
@@ -194,26 +194,35 @@ pub(crate) fn def_id_to_vir_path_ignoring_diagnostic_rename<'tcx>(
         .unwrap_or_else(|| panic!("unhandled name {:?}", def_id))
 }
 
-pub(crate) fn def_id_to_vir_path<'tcx>(
-    tcx: TyCtxt<'tcx>,
-    verus_items: &crate::verus_items::VerusItems,
-    def_id: DefId,
-) -> Path {
-    def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
-        .unwrap_or_else(|| panic!("unhandled name {:?}", def_id))
-}
-
 // pub(crate) fn def_id_to_vir_path<'tcx>(
 //     tcx: TyCtxt<'tcx>,
 //     verus_items: &crate::verus_items::VerusItems,
 //     def_id: DefId,
-//     // path_def_id_map: &mut HashMap<Path, DefId>,
 // ) -> Path {
-//     let result = def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
-//         .unwrap_or_else(|| panic!("unhandled name {:?}", def_id));
-//     // path_def_id_map.insert(result.clone(), def_id);
-//     result
+//     def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
+//         .unwrap_or_else(|| panic!("unhandled name {:?}", def_id))
 // }
+
+pub(crate) fn def_id_to_vir_path<'tcx>(
+    tcx: TyCtxt<'tcx>,
+    verus_items: &crate::verus_items::VerusItems,
+    def_id: DefId,
+    path_def_id_map: Option<std::cell::RefMut<HashMap<Path, DefId>>>,
+) -> Path {
+    let s = tcx.def_path_debug_str(def_id);
+    if s.contains("test") && s.contains("::X") {
+        panic!()
+    } else if s.contains("test"){
+        println!("test did {}", s)
+    }
+    let result = def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
+        .unwrap_or_else(|| panic!("unhandled name {:?}", def_id));
+    match path_def_id_map {
+        Some(mut map) => map.insert(result.clone(), def_id),
+        None => None,
+    };
+    result
+}
 
 pub(crate) fn def_id_to_datatype<'tcx, 'hir>(
     tcx: TyCtxt<'tcx>,
@@ -222,7 +231,7 @@ pub(crate) fn def_id_to_datatype<'tcx, 'hir>(
     typ_args: Typs,
     impl_paths: vir::ast::ImplPaths,
 ) -> TypX {
-    TypX::Datatype(Dt::Path(def_id_to_vir_path(tcx, verus_items, def_id)), typ_args, impl_paths)
+    TypX::Datatype(Dt::Path(def_id_to_vir_path(tcx, verus_items, def_id, None)), typ_args, impl_paths)
 }
 
 pub(crate) fn no_body_param_to_var<'tcx>(ident: &Ident) -> VarIdent {
@@ -514,7 +523,7 @@ pub(crate) fn get_impl_paths_for_clauses<'tcx>(
             });
             if let Ok(impl_source) = candidate {
                 if let rustc_middle::traits::ImplSource::UserDefined(u) = impl_source {
-                    let impl_path = def_id_to_vir_path(tcx, verus_items, u.impl_def_id);
+                    let impl_path = def_id_to_vir_path(tcx, verus_items, u.impl_def_id, None);
                     let impl_path = ImplPath::TraitImplPath(impl_path);
                     match (&mut remove_self_trait_bound, inst_bound) {
                         (Some((expected_id, self_trait_impl_path)), Some(b))
@@ -564,7 +573,7 @@ pub(crate) fn get_impl_paths_for_clauses<'tcx>(
                                 match trait_args.into_type_list(tcx)[0].kind() {
                                     TyKind::FnDef(fn_def_id, fn_node_substs) => {
                                         let fn_path =
-                                            def_id_to_vir_path(tcx, verus_items, *fn_def_id);
+                                            def_id_to_vir_path(tcx, verus_items, *fn_def_id, None);
                                         let fn_fun = Arc::new(vir::ast::FunX { path: fn_path });
                                         impl_paths.push(ImplPath::FnDefImplPath(fn_fun));
 
@@ -602,7 +611,7 @@ pub(crate) fn mk_visibility_from_vis<'tcx>(
 ) -> vir::ast::Visibility {
     let restricted_to = match visibility {
         Visibility::Public => None,
-        Visibility::Restricted(id) => Some(def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id)),
+        Visibility::Restricted(id) => Some(def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id, ctxt.name_def_id_map.try_borrow_mut().ok())),
     };
     vir::ast::Visibility { restricted_to }
 }
@@ -1085,7 +1094,7 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
             let t_args: Vec<_> = t.args.iter().filter(|x| x.as_region().is_none()).collect();
             match trait_def {
                 Some(trait_def) if t_args.len() >= 1 => {
-                    let trait_path = def_id_to_vir_path(tcx, verus_items, trait_def);
+                    let trait_path = def_id_to_vir_path(tcx, verus_items, trait_def, None);
                     // In rustc, see create_substs_for_ast_path and create_substs_for_generic_args
                     let mut trait_typ_args = Vec::new();
 
@@ -1140,7 +1149,7 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
                         resolved_item: ResolvedItem::FromImpl(did, _args),
                         ..
                     } => {
-                        let path = def_id_to_vir_path(tcx, verus_items, did);
+                        let path = def_id_to_vir_path(tcx, verus_items, did, None);
                         let fun = Arc::new(vir::ast::FunX { path });
                         Some(fun)
                     }
@@ -1174,7 +1183,7 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
                 }
             }
             let typ_args = typ_args.into_iter().map(|(t, _)| t).collect();
-            let path = def_id_to_vir_path(tcx, verus_items, *def_id);
+            let path = def_id_to_vir_path(tcx, verus_items, *def_id, None);
             let fun = Arc::new(vir::ast::FunX { path });
 
             let typx = TypX::FnDef(fun, Arc::new(typ_args), resolved);
@@ -1494,7 +1503,7 @@ pub(crate) fn check_generic_bound<'tcx>(
         let trait_name = if Some(trait_def_id) == tcx.lang_items().sized_trait() {
             TraitId::Sized
         } else {
-            TraitId::Path(def_id_to_vir_path(tcx, verus_items, trait_def_id))
+            TraitId::Path(def_id_to_vir_path(tcx, verus_items, trait_def_id, None))
         };
         Ok(Some(Arc::new(GenericBoundX::Trait(trait_name, Arc::new(vir_args)))))
     }

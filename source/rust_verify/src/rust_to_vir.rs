@@ -6,10 +6,6 @@ For soundness's sake, be as defensive as possible:
 - explicitly match all fields of the Rust AST so we catch any features added in the future
 */
 
-use crate::boundary_suggestions::{
-    build_const_assume_specification_suggestion, build_fn_assume_specification_suggestion,
-    build_external_type_suggestion,
-};
 use crate::context::Context;
 use crate::external::{CrateItems, GeneralItemId, VerifOrExternal};
 use crate::reveal_hide::handle_reveal_hide;
@@ -71,7 +67,7 @@ fn check_item<'tcx>(
 
     let mut handle_const_or_static = |body_id: &rustc_hir::BodyId| {
         let def_id = body_id.hir_id.owner.to_def_id();
-        let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id);
+        let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, def_id, ctxt.name_def_id_map.try_borrow_mut().ok());
         if vattrs.size_of_global {
             return Ok(()); // handled earlier
         }
@@ -358,7 +354,7 @@ fn check_foreign_item<'tcx>(
 }
 
 pub(crate) fn get_root_module_path<'tcx>(ctxt: &Context<'tcx>) -> Path {
-    def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, rustc_hir::CRATE_OWNER_ID.to_def_id())
+    def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, rustc_hir::CRATE_OWNER_ID.to_def_id(), ctxt.name_def_id_map.try_borrow_mut().ok())
 }
 
 pub fn crate_to_vir<'a, 'tcx>(
@@ -443,7 +439,7 @@ pub fn crate_to_vir<'a, 'tcx>(
                     item @ Item { kind: ItemKind::Mod(_ident, _module), owner_id, .. },
                 ) => {
                     let path =
-                        def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, owner_id.to_def_id());
+                        def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, owner_id.to_def_id(), ctxt.name_def_id_map.try_borrow_mut().ok());
                     if used_modules.contains(&path) {
                         vir.modules.push(ctxt.spanned_new(
                             item.span,

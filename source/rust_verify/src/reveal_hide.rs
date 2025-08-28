@@ -117,7 +117,7 @@ pub(crate) fn handle_reveal_hide<'ctxt>(
             }
         }
     };
-    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id);
+    let path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, id, ctxt.name_def_id_map.try_borrow_mut().ok());
 
     let ExprKind::Lit(fuel_lit) = args[1].kind else {
         unsupported_err!(expr.span, "invalid reveal", &args);

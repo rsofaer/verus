@@ -375,7 +375,7 @@ impl<'a, 'tcx> VisitMod<'a, 'tcx> {
             GeneralItem::Item(item) => match item.kind {
                 ItemKind::Mod(_ident, _module) => {
                     self.module_path =
-                        def_id_to_vir_path(self.ctxt.tcx, &self.ctxt.verus_items, def_id);
+                        def_id_to_vir_path(self.ctxt.tcx, &self.ctxt.verus_items, def_id, self.ctxt.name_def_id_map.try_borrow_mut().ok());
                 }
                 ItemKind::Impl(impll) => {
                     self.in_impl = Some(InsideImpl {
@@ -384,7 +384,7 @@ impl<'a, 'tcx> VisitMod<'a, 'tcx> {
                     });
                 }
                 ItemKind::Const(_ident, _ty, _generics, _body_id) => {
-                    let path = def_id_to_vir_path(self.ctxt.tcx, &self.ctxt.verus_items, def_id);
+                    let path = def_id_to_vir_path(self.ctxt.tcx, &self.ctxt.verus_items, def_id, self.ctxt.name_def_id_map.try_borrow_mut().ok());
                     if path
                         .segments
                         .iter()

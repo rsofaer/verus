@@ -118,6 +118,7 @@ fn trait_impl_to_vir<'tcx>(
                 types.push(mid_ty_to_vir(
                     ctxt.tcx,
                     &ctxt.verus_items,
+                    None,
                     impl_def_id,
                     span,
                     &ty,
@@ -173,7 +174,7 @@ fn translate_assoc_type<'tcx>(
     let impl_path = def_id_to_vir_path(ctxt.tcx, &ctxt.verus_items, impl_def_id, ctxt.name_def_id_map.try_borrow_mut().ok());
     let trait_ref = ctxt.tcx.impl_trait_ref(impl_def_id).expect("impl_trait_ref");
     let ty = ctxt.tcx.type_of(impl_item_id).skip_binder();
-    let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, impl_item_id, impl_item_span, &ty, false)?;
+    let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, None, impl_item_id, impl_item_span, &ty, false)?;
     let (typ_params, typ_bounds) = crate::rust_to_vir_base::check_generics_bounds_no_polarity(
         ctxt.tcx,
         &ctxt.verus_items,
@@ -485,6 +486,7 @@ pub(crate) fn translate_impl<'tcx>(
                     let vir_ty = mid_ty_to_vir(
                         ctxt.tcx,
                         &ctxt.verus_items,
+                        None,
                         def_id,
                         impl_item.span,
                         &mid_ty,

@@ -209,12 +209,6 @@ pub(crate) fn def_id_to_vir_path<'tcx>(
     def_id: DefId,
     path_def_id_map: Option<std::cell::RefMut<HashMap<Path, DefId>>>,
 ) -> Path {
-    let s = tcx.def_path_debug_str(def_id);
-    if s.contains("test") && s.contains("::X") {
-        panic!()
-    } else if s.contains("test"){
-        println!("test did {}", s)
-    }
     let result = def_id_to_vir_path_option(tcx, Some(verus_items), def_id)
         .unwrap_or_else(|| panic!("unhandled name {:?}", def_id));
     match path_def_id_map {
@@ -227,11 +221,12 @@ pub(crate) fn def_id_to_vir_path<'tcx>(
 pub(crate) fn def_id_to_datatype<'tcx, 'hir>(
     tcx: TyCtxt<'tcx>,
     verus_items: &crate::verus_items::VerusItems,
+    path_def_id_map: Option<std::cell::RefMut<HashMap<Path, DefId>>>,
     def_id: DefId,
     typ_args: Typs,
     impl_paths: vir::ast::ImplPaths,
 ) -> TypX {
-    TypX::Datatype(Dt::Path(def_id_to_vir_path(tcx, verus_items, def_id, None)), typ_args, impl_paths)
+    TypX::Datatype(Dt::Path(def_id_to_vir_path(tcx, verus_items, def_id, path_def_id_map)), typ_args, impl_paths)
 }
 
 pub(crate) fn no_body_param_to_var<'tcx>(ident: &Ident) -> VarIdent {
@@ -879,6 +874,7 @@ pub(crate) fn mid_generics_filter_for_external_impls<'tcx>(
 pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
     tcx: TyCtxt<'tcx>,
     verus_items: &crate::verus_items::VerusItems,
+    path_def_id_map: Option<std::cell::RefMut<HashMap<Path, DefId>>>,
     param_env_src: DefId,
     span: Span,
     ty: &rustc_middle::ty::Ty<'tcx>,
@@ -886,10 +882,10 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
 ) -> Result<(Typ, bool), VirErr> {
     use vir::ast::TypDecoration;
     let t_rec = |t: &rustc_middle::ty::Ty<'tcx>| {
-        mid_ty_to_vir_ghost(tcx, verus_items, param_env_src, span, t, allow_mut_ref)
+        mid_ty_to_vir_ghost(tcx, verus_items, None, param_env_src, span, t, allow_mut_ref)
     };
     let t_rec_flags = |t: &rustc_middle::ty::Ty<'tcx>, allow_mut_ref: bool| {
-        mid_ty_to_vir_ghost(tcx, verus_items, param_env_src, span, t, allow_mut_ref)
+        mid_ty_to_vir_ghost(tcx, verus_items, None, param_env_src, span, t, allow_mut_ref)
     };
     let t = match ty.kind() {
         TyKind::Bool => (Arc::new(TypX::Bool), false),
@@ -950,7 +946,7 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
         }
         TyKind::Array(ty, const_len) => {
             let typ =
-                mid_ty_to_vir_ghost(tcx, verus_items, param_env_src, span, ty, allow_mut_ref)?.0;
+                mid_ty_to_vir_ghost(tcx, verus_items, None, param_env_src, span, ty, allow_mut_ref)?.0;
             let len = mid_ty_const_to_vir(tcx, Some(span), const_len)?;
             let typs = Arc::new(vec![typ, len]);
             (Arc::new(TypX::Primitive(Primitive::Array, typs)), false)
@@ -1040,7 +1036,7 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
                 let typ_args = typ_args.into_iter().map(|(t, _)| t).collect();
                 let impl_paths = get_impl_paths(tcx, verus_items, param_env_src, did, args, None);
                 let datatypex =
-                    def_id_to_datatype(tcx, verus_items, did, Arc::new(typ_args), impl_paths);
+                    def_id_to_datatype(tcx, verus_items, path_def_id_map, did, Arc::new(typ_args), impl_paths);
                 (Arc::new(datatypex), false)
             }
         }
@@ -1170,6 +1166,7 @@ pub(crate) fn mid_ty_to_vir_ghost<'tcx>(
                         typ_args.push(mid_ty_to_vir_ghost(
                             tcx,
                             verus_items,
+                            None,
                             param_env_src,
                             span,
                             &t,
@@ -1224,12 +1221,13 @@ pub(crate) fn mid_ty_to_vir_datatype<'tcx>(
 pub(crate) fn mid_ty_to_vir<'tcx>(
     tcx: TyCtxt<'tcx>,
     verus_items: &crate::verus_items::VerusItems,
+    path_def_id_map: Option<std::cell::RefMut<HashMap<Path, DefId>>>,
     param_env_src: DefId,
     span: Span,
     ty: &rustc_middle::ty::Ty<'tcx>,
     allow_mut_ref: bool,
 ) -> Result<Typ, VirErr> {
-    Ok(mid_ty_to_vir_ghost(tcx, verus_items, param_env_src, span, ty, allow_mut_ref)?.0)
+    Ok(mid_ty_to_vir_ghost(tcx, verus_items, path_def_id_map, param_env_src, span, ty, allow_mut_ref)?.0)
 }
 
 pub(crate) fn mid_ty_const_to_vir<'tcx>(
@@ -1313,6 +1311,7 @@ pub(crate) fn typ_of_node<'tcx>(
     mid_ty_to_vir(
         bctx.ctxt.tcx,
         &bctx.ctxt.verus_items,
+        None,
         bctx.fun_id,
         span,
         &bctx.types.node_type(*id),
@@ -1327,7 +1326,7 @@ pub(crate) fn typ_of_node_expect_mut_ref<'tcx>(
 ) -> Result<Typ, VirErr> {
     let ty = bctx.types.node_type(*id);
     if let TyKind::Ref(_, _tys, rustc_ast::Mutability::Mut) = ty.kind() {
-        mid_ty_to_vir(bctx.ctxt.tcx, &bctx.ctxt.verus_items, bctx.fun_id, span, &ty, true)
+        mid_ty_to_vir(bctx.ctxt.tcx, &bctx.ctxt.verus_items, None, bctx.fun_id, span, &ty, true)
     } else {
         err_span(span, "a mutable reference is expected here")
     }
@@ -1489,6 +1488,7 @@ pub(crate) fn check_generic_bound<'tcx>(
                     vir_args.push(mid_ty_to_vir(
                         tcx,
                         verus_items,
+                        None,
                         param_env_src,
                         span,
                         &ty,
@@ -1618,7 +1618,7 @@ where
                     continue;
                 }
                 let typ = if let TermKind::Ty(ty) = pred.term.unpack() {
-                    mid_ty_to_vir(tcx, verus_items, param_env_src, *span, &ty, false)?
+                    mid_ty_to_vir(tcx, verus_items, None, param_env_src, *span, &ty, false)?
                 } else {
                     return err_span(*span, "Verus does not yet support this type of bound");
                 };
@@ -1652,7 +1652,7 @@ where
             }
             ClauseKind::ConstArgHasType(cnst, ty) => {
                 let t1 = mid_ty_const_to_vir(tcx, Some(*span), &cnst)?;
-                let t2 = mid_ty_to_vir(tcx, verus_items, param_env_src, *span, &ty, false)?;
+                let t2 = mid_ty_to_vir(tcx, verus_items, None, param_env_src, *span, &ty, false)?;
                 let bound = GenericBoundX::ConstTyp(t1, t2);
                 bounds.push(Arc::new(bound));
             }

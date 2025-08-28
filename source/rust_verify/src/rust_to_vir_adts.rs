@@ -86,6 +86,7 @@ where
         let typ = mid_ty_to_vir(
             ctxt.tcx,
             &ctxt.verus_items,
+            None,
             item_id.owner_id.to_def_id(),
             span,
             &field_ty,
@@ -368,7 +369,7 @@ pub(crate) fn check_item_union<'tcx>(
             total_vis = total_vis.join(&vis);
 
             let field_ty = ctxt.tcx.type_of(field_def.did).skip_binder();
-            let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, def_id, span, &field_ty, false)?;
+            let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, None, def_id, span, &field_ty, false)?;
 
             let field = (typ, Mode::Exec, vis);
             let variant = Variant {
@@ -510,6 +511,7 @@ fn get_sized_constraint<'tcx>(
     Ok(Some(mid_ty_to_vir(
         ctxt.tcx,
         &ctxt.verus_items,
+        None,
         adt_def.did(),
         span,
         &sized_constraint,

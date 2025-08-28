@@ -182,6 +182,7 @@ pub(crate) fn closure_param_typs<'tcx>(
                 args.push(mid_ty_to_vir(
                     bctx.ctxt.tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     expr.span,
                     t,
@@ -207,6 +208,7 @@ fn closure_ret_typ<'tcx>(bctx: &BodyCtxt<'tcx>, expr: &Expr<'tcx>) -> Result<Typ
             mid_ty_to_vir(
                 bctx.ctxt.tcx,
                 &bctx.ctxt.verus_items,
+                None,
                 bctx.fun_id,
                 expr.span,
                 &t,
@@ -1018,6 +1020,7 @@ pub(crate) fn expr_to_vir_with_adjustments<'tcx>(
         mid_ty_to_vir(
             bctx.ctxt.tcx,
             &bctx.ctxt.verus_items,
+            None,
             bctx.fun_id,
             expr.span,
             &adjustments[adjustment_idx - 1].target,
@@ -1297,6 +1300,7 @@ pub(crate) fn expr_to_vir_with_adjustments<'tcx>(
                 let expr_typ = mid_ty_to_vir(
                     bctx.ctxt.tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     expr.span,
                     &ty2,
@@ -1769,6 +1773,7 @@ pub(crate) fn expr_to_vir_innermost<'tcx>(
                             arg_typs.push(mid_ty_to_vir(
                                 tcx,
                                 &bctx.ctxt.verus_items,
+                                None,
                                 bctx.fun_id,
                                 arg.span,
                                 &bctx.types.expr_ty_adjusted(arg),
@@ -1785,6 +1790,7 @@ pub(crate) fn expr_to_vir_innermost<'tcx>(
                         let fun_typ = mid_ty_to_vir(
                             tcx,
                             &bctx.ctxt.verus_items,
+                            None,
                             bctx.fun_id,
                             fun.span,
                             &fun_ty,
@@ -1894,6 +1900,7 @@ pub(crate) fn expr_to_vir_innermost<'tcx>(
                 let array_vir_typ = mid_ty_to_vir(
                     bctx.ctxt.tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     expr.span,
                     &bctx.types.expr_ty(expr),
@@ -2825,6 +2832,7 @@ fn expr_assign_to_vir_innermost<'tcx>(
                 let deref_ghost = mid_ty_to_vir_ghost(
                     bctx.ctxt.tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     lhs.span,
                     &bctx.types.expr_ty_adjusted(lhs),
@@ -3358,6 +3366,7 @@ fn is_ptr_cast<'tcx>(
                 let src_ty = mid_ty_to_vir(
                     bctx.ctxt.tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     span,
                     ty1,
@@ -3366,6 +3375,7 @@ fn is_ptr_cast<'tcx>(
                 let dst_ty = mid_ty_to_vir(
                     bctx.ctxt.tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     span,
                     ty2,
@@ -3387,6 +3397,7 @@ fn is_ptr_cast<'tcx>(
             let src_ty = mid_ty_to_vir(
                 bctx.ctxt.tcx,
                 &bctx.ctxt.verus_items,
+                None,
                 bctx.fun_id,
                 span,
                 ty1,
@@ -3490,6 +3501,7 @@ fn deref_expr_to_vir<'tcx>(
         let inner_ty = mid_ty_to_vir(
             bctx.ctxt.tcx,
             &bctx.ctxt.verus_items,
+            None,
             bctx.fun_id,
             expr.span,
             &res_ty,

@@ -265,7 +265,7 @@ fn check_fn_decl<'tcx>(
         // so we always return the default mode.
         // The current workaround is to return a struct if the default doesn't work.
         rustc_hir::FnRetTy::Return(_ty) => {
-            let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, id, span, &output_ty, false)?;
+            let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, ctxt.name_def_id_map.try_borrow_mut().ok(), id, span, &output_ty, false)?;
             Ok(Some((typ, get_ret_mode(mode, attrs))))
         }
     }
@@ -932,7 +932,7 @@ pub(crate) fn check_item_fn<'tcx>(
         };
 
         let ty = fn_sig.output().skip_binder();
-        let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, id, sig.span, &ty, false)?;
+        let typ = mid_ty_to_vir(ctxt.tcx, &ctxt.verus_items, None, id, sig.span, &ty, false)?;
 
         let fun = check_item_const_or_static(
             ctxt,
@@ -1093,6 +1093,7 @@ pub(crate) fn check_item_fn<'tcx>(
             let typ = mid_ty_to_vir(
                 ctxt.tcx,
                 &ctxt.verus_items,
+                ctxt.name_def_id_map.try_borrow_mut().ok(),
                 id,
                 span,
                 is_ref_mut.map(|(t, _)| t).unwrap_or(input),
@@ -2040,6 +2041,7 @@ pub(crate) fn get_external_def_id<'tcx>(
                     types.push(mid_ty_to_vir(
                         tcx,
                         &verus_items,
+                        None,
                         impl_item_id,
                         sig.span,
                         &ty,
@@ -2265,6 +2267,7 @@ pub(crate) fn check_foreign_item_fn<'tcx>(
         let typ = mid_ty_to_vir(
             ctxt.tcx,
             &ctxt.verus_items,
+            None,
             id,
             param.span,
             is_mut.map(|(t, _)| t).unwrap_or(input),

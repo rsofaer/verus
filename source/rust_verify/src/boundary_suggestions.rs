@@ -55,7 +55,7 @@ pub(crate) fn build_external_type_suggestion<'tcx>(
     let visibility = mk_visibility(ctxt, external_def_id);
     let suggestion =
         format!(
-            "\nThe following declaration may allow Verus to refer to this type from verified code:\n{}{}{}{}{}{}{}{}{}{}{}{}",
+            "{}{}{}{}{}{}{}{}{}{}{}{}",
             // Polarity annotations
             all_type_params.iter().fold(String::new(), |acc, x| acc
                 + "#[verifier::reject_recursive_types("
@@ -67,7 +67,7 @@ pub(crate) fn build_external_type_suggestion<'tcx>(
                 Some(_) => "", // This may be the point that it makes sense to check for the type being in a private module or otherwise not visible
             },
             "struct ",
-            &path.last_segment(), // Proxy type name
+            "Ex".to_owned() + &path.last_segment(), // Proxy type name
             if generics.is_empty() {
                 "".to_owned()
             } else {

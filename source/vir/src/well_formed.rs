@@ -1790,7 +1790,7 @@ fn build_dummy_dt(
             proxy: None,
             owning_module: None,
             visibility: Visibility { restricted_to: None },
-            transparency: DatatypeTransparency::Never,
+            transparency: DatatypeTransparency::WhenVisible(Visibility::public()),
             typ_params: Arc::new(vec![]),
             typ_bounds: Arc::new(vec![]),
             variants: Arc::new(vec![]),

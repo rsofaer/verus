@@ -2833,7 +2833,6 @@ impl Verifier {
                             // let did = vir_path_to_def_id(tcx, &ctxt.verus_items, &p);
                             let map = ctxt.name_def_id_map.borrow();
                             let did = map.get(&p);
-                            println!("name def id map: {:#?}\np: {:?}\ndid: {:?}", map, p, did);
                             match did {
                                 Some(did) => {
                                     match build_boundary_suggestion(&ctxt, *did, &p) {

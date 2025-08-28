@@ -1173,6 +1173,7 @@ fn verus_item_to_vir<'tcx, 'a>(
             let t = mid_ty_to_vir(
                 tcx,
                 &bctx.ctxt.verus_items,
+                None,
                 bctx.fun_id,
                 expr.span,
                 &arg_typ,
@@ -1496,6 +1497,7 @@ fn verus_item_to_vir<'tcx, 'a>(
                     GenericArgKind::Type(ty) => mid_ty_to_vir(
                         tcx,
                         &bctx.ctxt.verus_items,
+                        None,
                         bctx.fun_id,
                         expr.span,
                         &ty,
@@ -1681,6 +1683,7 @@ fn verus_item_to_vir<'tcx, 'a>(
             let t = mid_ty_to_vir(
                 tcx,
                 &bctx.ctxt.verus_items,
+                None,
                 bctx.fun_id,
                 expr.span,
                 &arg_typ,
@@ -2152,6 +2155,7 @@ fn mk_typ_args<'tcx>(
                 typ_args.push(mid_ty_to_vir(
                     tcx,
                     &bctx.ctxt.verus_items,
+                    None,
                     bctx.fun_id,
                     span,
                     &ty,
@@ -2291,7 +2295,7 @@ pub(crate) fn check_variant_field<'tcx>(
         }
     };
 
-    let vir_adt_ty = mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, bctx.fun_id, span, &ty, false)?;
+    let vir_adt_ty = mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, None, bctx.fun_id, span, &ty, false)?;
     let adt_path = match &*vir_adt_ty {
         TypX::Datatype(path, _, _) => path.clone(),
         _ => {
@@ -2334,10 +2338,11 @@ pub(crate) fn check_variant_field<'tcx>(
 
             let field_ty = field.ty(tcx, substs);
             let vir_field_ty =
-                mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, bctx.fun_id, span, &field_ty, false)?;
+                mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, None, bctx.fun_id, span, &field_ty, false)?;
             let vir_expected_field_ty = mid_ty_to_vir(
                 tcx,
                 &bctx.ctxt.verus_items,
+                None,
                 bctx.fun_id,
                 span,
                 &expected_field_typ,
@@ -2388,14 +2393,14 @@ fn check_union_field<'tcx>(
 
     let field_ty = field.ty(tcx, substs);
     let vir_field_ty =
-        mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, bctx.fun_id, span, &field_ty, false)?;
+        mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, None, bctx.fun_id, span, &field_ty, false)?;
     let vir_expected_field_ty =
-        mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, bctx.fun_id, span, &expected_field_typ, false)?;
+        mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, None, bctx.fun_id, span, &expected_field_typ, false)?;
     if !types_equal(&vir_field_ty, &vir_expected_field_ty) {
         return err_span(span, "field has the wrong type");
     }
 
-    let vir_adt_ty = mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, bctx.fun_id, span, &ty, false)?;
+    let vir_adt_ty = mid_ty_to_vir(tcx, &bctx.ctxt.verus_items, None, bctx.fun_id, span, &ty, false)?;
     let adt_path = match &*vir_adt_ty {
         TypX::Datatype(path, _, _) => path.clone(),
         _ => {
